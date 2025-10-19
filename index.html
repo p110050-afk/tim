@@ -1,0 +1,1734 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <link id="favicon" rel="icon" href="" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>程式編輯器</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .toolbar {
+            background: #2d2d30;
+            padding: 8px 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            border-bottom: 1px solid #3e3e42;
+            position: relative;
+        }
+        
+        .toolbar h1 {
+            font-size: 14px;
+            margin-right: 15px;
+            color: #cccccc;
+        }
+        
+        .btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 11px;
+            font-family: inherit;
+            transition: background 0.2s;
+            color: white;
+        }
+        
+        .btn-primary { background: #0e639c; }
+        .btn-primary:hover { background: #1177bb; }
+        .btn-success { background: #107c10; }
+        .btn-success:hover { background: #14a414; }
+        .btn-warning { background: #ca5010; }
+        .btn-warning:hover { background: #e85d1a; }
+        .btn-danger { background: #c50e2f; }
+        .btn-danger:hover { background: #e81041; }
+        .btn-secondary { background: #5a5a5a; }
+        .btn-secondary:hover { background: #6e6e6e; }
+        
+        .file-select {
+            background: #3c3c3c;
+            border: 1px solid #5a5a5a;
+            color: #cccccc;
+            padding: 5px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            min-width: 150px;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        /* 搜尋工具列 */
+        .search-toolbar {
+            background: #252526;
+            border-bottom: 1px solid #3e3e42;
+            padding: 8px 10px;
+            display: none;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        
+        .search-input {
+            background: #3c3c3c;
+            border: 1px solid #5a5a5a;
+            color: #cccccc;
+            padding: 6px 10px;
+            border-radius: 3px;
+            font-size: 12px;
+            min-width: 200px;
+            font-family: inherit;
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: #007acc;
+        }
+        
+        .search-results {
+            color: #cccccc;
+            font-size: 11px;
+            white-space: nowrap;
+        }
+        
+        .search-nav-btn {
+            padding: 4px 8px;
+            background: #5a5a5a;
+            border: none;
+            border-radius: 3px;
+            color: white;
+            cursor: pointer;
+            font-size: 11px;
+            min-width: 24px;
+        }
+        
+        .search-nav-btn:hover {
+            background: #6e6e6e;
+        }
+        
+        .search-nav-btn:disabled {
+            background: #404040;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+        
+        .main-container {
+            display: flex;
+            flex: 1;
+            min-height: 0;
+        }
+        
+        .editor-container {
+            flex: 1;
+            position: relative;
+            background: #1e1e1e;
+            display: flex;
+        }
+        
+        .line-numbers {
+            background: #252526;
+            color: #858585;
+            padding: 15px 8px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            text-align: right;
+            min-width: 50px;
+            border-right: 1px solid #3e3e42;
+            user-select: none;
+            overflow: hidden;
+            white-space: pre;
+        }
+        
+        .editor-wrapper {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .code-editor {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+            padding: 15px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            resize: none;
+            outline: none;
+            background: transparent;
+            color: transparent;
+            caret-color: #d4d4d4;
+            tab-size: 4;
+            z-index: 2;
+        }
+        
+        .syntax-highlight {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            padding: 15px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            background: #1e1e1e;
+            overflow: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            pointer-events: none;
+            z-index: 1;
+        }
+        
+        /* 語法高亮顏色 (VS Code Dark 風格) */
+        .html-tag { color: #569cd6; font-weight: normal; }
+        .html-attribute { color: #92c5f8; }
+        .html-string { color: #ce9178; }
+        .html-comment { color: #6a9955; font-style: italic; }
+        .html-doctype { color: #569cd6; font-weight: bold; }
+        .css-selector { color: #d7ba7d; }
+        .css-property { color: #9cdcfe; }
+        .css-value { color: #ce9178; }
+        .js-keyword { color: #569cd6; font-weight: bold; }
+        .js-string { color: #ce9178; }
+        .js-comment { color: #6a9955; font-style: italic; }
+        .js-number { color: #b5cea8; }
+        
+        /* 搜尋高亮 */
+        .search-highlight {
+            background: #613214;
+            border-radius: 2px;
+            padding: 0 1px;
+        }
+        
+        .search-highlight.current {
+            background: #f99b11;
+            color: #000;
+        }
+        
+        .status-bar {
+            background: #007acc;
+            color: white;
+            padding: 4px 10px;
+            font-size: 11px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .status-left, .status-right {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        
+        .autosave-indicator {
+            position: fixed;
+            top: 50px;
+            right: 20px;
+            background: #107c10;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 1000;
+        }
+        
+        .autosave-indicator.show {
+            opacity: 1;
+        }
+        
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 11px;
+        }
+        
+        .checkbox-container input[type="checkbox"] {
+            margin: 0;
+        }
+        
+        @media (max-width: 768px) {
+            .toolbar {
+                flex-wrap: wrap;
+                gap: 5px;
+            }
+            
+            .toolbar h1 {
+                width: 100%;
+                margin-bottom: 5px;
+                margin-right: 0;
+            }
+            
+            .btn {
+                padding: 4px 8px;
+                font-size: 10px;
+            }
+            
+            .search-toolbar {
+                flex-wrap: wrap;
+                gap: 5px;
+            }
+            
+            .search-input {
+                min-width: 150px;
+            }
+            
+            .status-bar {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <h1>📝 程式編輯器</h1>
+        
+        <select id="fileSelect" class="file-select">
+            <option value="">選擇檔案...</option>
+        </select>
+        
+        <button class="btn btn-primary" onclick="openFiles()">開啟檔案</button>
+        <button class="btn btn-success" onclick="newFile()">新檔案</button>
+        <button class="btn btn-primary" onclick="saveFile()">儲存</button>
+        <button class="btn btn-secondary" onclick="renameFile()">重新命名</button>
+        <button class="btn btn-danger" onclick="closeFile()">關閉檔案</button>
+        
+        <button class="btn btn-secondary" onclick="copyAll()">複製全文</button>
+        <button class="btn btn-secondary" onclick="pasteContent()">貼上</button>
+        <button class="btn btn-warning" onclick="clearContent()">清除內容</button>
+        
+        <button class="btn btn-success" onclick="runHTML()" id="runBtn" style="display: none;">執行HTML</button>
+        <button class="btn btn-secondary" onclick="toggleSearch()">🔍 搜尋</button>
+        
+        <button class="btn btn-primary" onclick="saveToIndexedDB()">💾 儲存到資料庫</button>
+        <button class="btn btn-success" onclick="loadFromIndexedDB()">📂 從資料庫載入</button>
+        <button class="btn btn-warning" onclick="exportAllFiles()">📤 匯出所有檔案</button>
+        <button class="btn btn-danger" onclick="clearDatabase()">🗑️ 清除資料庫</button>
+        
+        <div class="checkbox-container">
+            <input type="checkbox" id="wordWrapToggle" onchange="toggleWordWrap()">
+            <label for="wordWrapToggle">自動換行</label>
+        </div>
+        
+        <input type="file" id="fileInput" class="file-input" multiple 
+               accept=".html,.htm,.css,.js,.txt,.json,.xml,.md,.py,.java,.cpp,.c,.php,.rb,.go,.rs,.ts,.jsx,.tsx,.vue,.scss,.sass,.less,.sql,.sh,.bat,.yaml,.yml,.ini,.cfg,.conf">
+    </div>
+    
+    <!-- 搜尋工具列 -->
+    <div id="searchToolbar" class="search-toolbar">
+        <input type="text" id="searchInput" class="search-input" placeholder="輸入搜尋內容...">
+        <div class="checkbox-container">
+            <input type="checkbox" id="caseSensitiveToggle">
+            <label for="caseSensitiveToggle">區分大小寫</label>
+        </div>
+        <div class="checkbox-container">
+            <input type="checkbox" id="wholeWordToggle">
+            <label for="wholeWordToggle">整字匹配</label>
+        </div>
+        <button class="search-nav-btn" id="prevBtn" onclick="navigateSearch(-1)" title="上一個">↑</button>
+        <button class="search-nav-btn" id="nextBtn" onclick="navigateSearch(1)" title="下一個">↓</button>
+        <div class="search-results" id="searchResults"></div>
+        <button class="btn btn-secondary" onclick="toggleSearch()">✕</button>
+    </div>
+    
+    <div class="main-container">
+        <div class="editor-container">
+            <div id="lineNumbers" class="line-numbers">1</div>
+            <div class="editor-wrapper">
+                <div id="syntaxHighlight" class="syntax-highlight"></div>
+                <textarea id="codeEditor" class="code-editor" placeholder="選擇或創建一個檔案開始編輯..."></textarea>
+            </div>
+        </div>
+    </div>
+    
+    <div class="status-bar">
+        <div class="status-left">
+            <span id="fileStatus">未選擇檔案</span>
+            <span id="saveStatus"></span>
+            <span id="dbStatus">資料庫: 未初始化</span>
+        </div>
+        <div class="status-right">
+            <span id="fileCount">檔案: 0</span>
+            <span id="lineCount">行: 0</span>
+            <span id="charCount">字元: 0</span>
+        </div>
+    </div>
+    
+    <div id="autosaveIndicator" class="autosave-indicator">
+        自動儲存完成
+    </div>
+
+    <script>
+        // 全域變數
+        let files = {};
+        let currentFile = null;
+        let fileCounter = 1;
+        let autosaveTimeout = null;
+        let isModified = false;
+        let searchResults = [];
+        let currentSearchIndex = -1;
+        let isSearchVisible = false;
+        let db = null;
+        
+        // DOM 元素
+        const codeEditor = document.getElementById('codeEditor');
+        const syntaxHighlight = document.getElementById('syntaxHighlight');
+        const lineNumbers = document.getElementById('lineNumbers');
+        const fileSelect = document.getElementById('fileSelect');
+        const fileStatus = document.getElementById('fileStatus');
+        const saveStatus = document.getElementById('saveStatus');
+        const dbStatus = document.getElementById('dbStatus');
+        const fileCount = document.getElementById('fileCount');
+        const lineCount = document.getElementById('lineCount');
+        const charCount = document.getElementById('charCount');
+        const autosaveIndicator = document.getElementById('autosaveIndicator');
+        const runBtn = document.getElementById('runBtn');
+        const searchToolbar = document.getElementById('searchToolbar');
+        const searchInput = document.getElementById('searchInput');
+        const searchResultsDiv = document.getElementById('searchResults');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const caseSensitiveToggle = document.getElementById('caseSensitiveToggle');
+        const wholeWordToggle = document.getElementById('wholeWordToggle');
+        
+        // 初始化
+        initIndexedDB();
+        loadFromLocalStorage();
+        updateUI();        
+        function initIndexedDB() {
+            const request = indexedDB.open('CodeEditorDB', 1);
+            
+            request.onerror = function(event) {
+                console.error('IndexedDB 初始化失敗:', event.target.error);
+                dbStatus.textContent = '資料庫: 錯誤';
+                dbStatus.style.color = '#f14c4c';
+            };
+            
+            request.onsuccess = function(event) {
+                db = event.target.result;
+                console.log('IndexedDB 初始化成功');
+                dbStatus.textContent = '資料庫: 已連線';
+                dbStatus.style.color = '#6a9955';
+                
+                // 自動從 IndexedDB 載入檔案
+                loadFromIndexedDB();
+            };
+            
+            request.onupgradeneeded = function(event) {
+                db = event.target.result;
+                
+                // 創建物件存儲
+                if (!db.objectStoreNames.contains('files')) {
+                    const fileStore = db.createObjectStore('files', { keyPath: 'name' });
+                    fileStore.createIndex('lastModified', 'lastModified', { unique: false });
+                }
+                
+                if (!db.objectStoreNames.contains('settings')) {
+                    const settingsStore = db.createObjectStore('settings', { keyPath: 'key' });
+                }
+                
+                console.log('IndexedDB 資料表創建完成');
+            };
+        }
+        
+        function saveToIndexedDB() {
+            if (!db) {
+                alert('資料庫未初始化');
+                return;
+            }
+            
+            if (Object.keys(files).length === 0) {
+                alert('沒有檔案可以儲存');
+                return;
+            }
+            
+            const transaction = db.transaction(['files', 'settings'], 'readwrite');
+            const fileStore = transaction.objectStore('files');
+            const settingsStore = transaction.objectStore('settings');
+            
+            let savedCount = 0;
+            let totalFiles = Object.keys(files).length;
+            
+            // 儲存所有檔案
+            for (const [fileName, fileData] of Object.entries(files)) {
+                const fileRecord = {
+                    name: fileName,
+                    content: fileData.content,
+                    lastModified: new Date(),
+                    saved: true,
+                    extension: getFileExtension(fileName)
+                };
+                
+                const request = fileStore.put(fileRecord);
+                
+                request.onsuccess = function() {
+                    savedCount++;
+                    if (savedCount === totalFiles) {
+                        // 所有檔案都儲存完成，儲存設定
+                        const settings = {
+                            key: 'editorSettings',
+                            currentFile: currentFile,
+                            fileCounter: fileCounter,
+                            savedAt: new Date()
+                        };
+                        
+                        settingsStore.put(settings);
+                        showAutosaveIndicator(`已儲存 ${totalFiles} 個檔案到資料庫`);
+                    }
+                };
+                
+                request.onerror = function(event) {
+                    console.error(`儲存檔案 ${fileName} 失敗:`, event.target.error);
+                };
+            }
+            
+            transaction.oncomplete = function() {
+                // 標記所有檔案為已儲存
+                for (const fileName of Object.keys(files)) {
+                    files[fileName].saved = true;
+                }
+                updateUI();
+                updateFileSelect();
+            };
+            
+            transaction.onerror = function(event) {
+                console.error('儲存到 IndexedDB 失敗:', event.target.error);
+                alert('儲存失敗，請檢查瀏覽器設定');
+            };
+        }
+        
+        function loadFromIndexedDB() {
+            if (!db) {
+                console.log('資料庫未初始化，無法載入');
+                return;
+            }
+            
+            const transaction = db.transaction(['files', 'settings'], 'readonly');
+            const fileStore = transaction.objectStore('files');
+            const settingsStore = transaction.objectStore('settings');
+            
+            // 載入設定
+            const settingsRequest = settingsStore.get('editorSettings');
+            settingsRequest.onsuccess = function(event) {
+                const settings = event.target.result;
+                if (settings) {
+                    fileCounter = settings.fileCounter || 1;
+                    console.log('載入編輯器設定');
+                }
+            };
+            
+            // 載入所有檔案
+            const filesRequest = fileStore.getAll();
+            filesRequest.onsuccess = function(event) {
+                const fileRecords = event.target.result;
+                
+                if (fileRecords.length === 0) {
+                    console.log('資料庫中沒有檔案');
+                    return;
+                }
+                
+                // 清空現有檔案（如果需要）
+                const shouldMerge = Object.keys(files).length > 0 && 
+                    confirm(`目前已有 ${Object.keys(files).length} 個檔案，要合併資料庫中的檔案嗎？\n\n取消將覆蓋現有檔案`);
+                
+                if (!shouldMerge) {
+                    files = {};
+                }
+                
+                // 載入檔案
+                let loadedCount = 0;
+                let duplicateCount = 0;
+                
+                fileRecords.forEach(record => {
+                    let fileName = record.name;
+                    
+                    // 處理重複檔名
+                    if (files[fileName] && shouldMerge) {
+                        let counter = 1;
+                        const nameParts = record.name.split('.');
+                        const ext = nameParts.pop();
+                        const baseName = nameParts.join('.');
+                        
+                        do {
+                            fileName = `${baseName}_db${counter}.${ext}`;
+                            counter++;
+                        } while (files[fileName]);
+                        
+                        duplicateCount++;
+                    }
+                    
+                    files[fileName] = {
+                        content: record.content || '',
+                        lastModified: record.lastModified || new Date(),
+                        saved: true
+                    };
+                    
+                    loadedCount++;
+                });
+                
+                // 設定當前檔案
+                if (!currentFile && Object.keys(files).length > 0) {
+                    // 從設定中恢復當前檔案，或選擇第一個
+                    const settingsRequest = settingsStore.get('editorSettings');
+                    settingsRequest.onsuccess = function(event) {
+                        const settings = event.target.result;
+                        let targetFile = null;
+                        
+                        if (settings && settings.currentFile && files[settings.currentFile]) {
+                            targetFile = settings.currentFile;
+                        } else {
+                            targetFile = Object.keys(files)[0];
+                        }
+                        
+                        currentFile = targetFile;
+                        switchToFile(currentFile);
+                    };
+                } else if (currentFile && files[currentFile]) {
+                    switchToFile(currentFile);
+                }
+                
+                updateFileSelect();
+                updateUI();
+                
+                let message = `已載入 ${loadedCount} 個檔案`;
+                if (duplicateCount > 0) {
+                    message += `（${duplicateCount} 個重複檔案已重新命名）`;
+                }
+                showAutosaveIndicator(message);
+            };
+            
+            filesRequest.onerror = function(event) {
+                console.error('從 IndexedDB 載入失敗:', event.target.error);
+            };
+        }
+        
+        function exportAllFiles() {
+            if (Object.keys(files).length === 0) {
+                alert('沒有檔案可以匯出');
+                return;
+            }
+            
+            const exportData = {
+                version: '1.0',
+                exportDate: new Date().toISOString(),
+                currentFile: currentFile,
+                fileCounter: fileCounter,
+                files: {}
+            };
+            
+            // 準備檔案資料
+            for (const [fileName, fileData] of Object.entries(files)) {
+                exportData.files[fileName] = {
+                    content: fileData.content,
+                    lastModified: fileData.lastModified,
+                    extension: getFileExtension(fileName)
+                };
+            }
+            
+            const dataStr = JSON.stringify(exportData, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `code-editor-backup-${new Date().getTime()}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showAutosaveIndicator(`已匯出 ${Object.keys(files).length} 個檔案`);
+        }
+        
+        function clearDatabase() {
+            if (!db) {
+                alert('資料庫未初始化');
+                return;
+            }
+            
+            if (!confirm('確定要清除資料庫中的所有資料嗎？\n\n這個操作無法復原！')) {
+                return;
+            }
+            
+            const transaction = db.transaction(['files', 'settings'], 'readwrite');
+            const fileStore = transaction.objectStore('files');
+            const settingsStore = transaction.objectStore('settings');
+            
+            const clearFiles = fileStore.clear();
+            const clearSettings = settingsStore.clear();
+            
+            clearFiles.onsuccess = function() {
+                console.log('檔案資料已清除');
+            };
+            
+            clearSettings.onsuccess = function() {
+                console.log('設定資料已清除');
+            };
+            
+            transaction.oncomplete = function() {
+                showAutosaveIndicator('資料庫已清空');
+            };
+            
+            transaction.onerror = function(event) {
+                console.error('清除資料庫失敗:', event.target.error);
+                alert('清除失敗');
+            };
+        }
+        
+        // 匯入檔案功能（處理 JSON 備份檔案）
+        function handleImportFile(file) {
+            if (file.type === 'application/json' && file.name.includes('code-editor-backup')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const importData = JSON.parse(e.target.result);
+                        
+                        if (!importData.files || typeof importData.files !== 'object') {
+                            throw new Error('無效的備份檔案格式');
+                        }
+                        
+                        const shouldMerge = Object.keys(files).length > 0 && 
+                            confirm(`要合併備份檔案中的 ${Object.keys(importData.files).length} 個檔案嗎？\n\n取消將覆蓋現有檔案`);
+                        
+                        if (!shouldMerge) {
+                            files = {};
+                        }
+                        
+                        let importedCount = 0;
+                        let duplicateCount = 0;
+                        
+                        for (const [fileName, fileData] of Object.entries(importData.files)) {
+                            let targetFileName = fileName;
+                            
+                            // 處理重複檔名
+                            if (files[targetFileName] && shouldMerge) {
+                                let counter = 1;
+                                const nameParts = fileName.split('.');
+                                const ext = nameParts.pop();
+                                const baseName = nameParts.join('.');
+                                
+                                do {
+                                    targetFileName = `${baseName}_imported${counter}.${ext}`;
+                                    counter++;
+                                } while (files[targetFileName]);
+                                
+                                duplicateCount++;
+                            }
+                            
+                            files[targetFileName] = {
+                                content: fileData.content || '',
+                                lastModified: new Date(fileData.lastModified) || new Date(),
+                                saved: true
+                            };
+                            
+                            importedCount++;
+                        }
+                        
+                        // 恢復設定
+                        if (importData.fileCounter) {
+                            fileCounter = Math.max(fileCounter, importData.fileCounter);
+                        }
+                        
+                        // 設定當前檔案
+                        if (!currentFile && Object.keys(files).length > 0) {
+                            if (importData.currentFile && files[importData.currentFile]) {
+                                currentFile = importData.currentFile;
+                            } else {
+                                currentFile = Object.keys(files)[0];
+                            }
+                            switchToFile(currentFile);
+                        }
+                        
+                        updateFileSelect();
+                        updateUI();
+                        
+                        let message = `已匯入 ${importedCount} 個檔案`;
+                        if (duplicateCount > 0) {
+                            message += `（${duplicateCount} 個重複檔案已重新命名）`;
+                        }
+                        showAutosaveIndicator(message);
+                        
+                    } catch (error) {
+                        alert(`匯入失敗: ${error.message}`);
+                        console.error('匯入錯誤:', error);
+                    }
+                };
+                reader.readAsText(file);
+                return true;
+            }
+            return false;
+        }
+        
+        // 搜尋功能
+        function toggleSearch() {
+            isSearchVisible = !isSearchVisible;
+            searchToolbar.style.display = isSearchVisible ? 'flex' : 'none';
+            
+            if (isSearchVisible) {
+                searchInput.focus();
+                if (searchInput.value) {
+                    performSearch();
+                }
+            } else {
+                clearSearchHighlights();
+                searchResults = [];
+                currentSearchIndex = -1;
+                updateSearchResults();
+            }
+        }
+        
+        function performSearch() {
+            const searchTerm = searchInput.value;
+            if (!searchTerm || !currentFile) {
+                clearSearchHighlights();
+                searchResults = [];
+                currentSearchIndex = -1;
+                updateSearchResults();
+                return;
+            }
+            
+            const content = codeEditor.value;
+            const caseSensitive = caseSensitiveToggle.checked;
+            const wholeWord = wholeWordToggle.checked;
+            
+            searchResults = [];
+            
+            // 建構搜尋正則表達式
+            let regex;
+            try {
+                let pattern = wholeWord ? `\\b${escapeRegExp(searchTerm)}\\b` : escapeRegExp(searchTerm);
+                regex = new RegExp(pattern, caseSensitive ? 'g' : 'gi');
+            } catch (e) {
+                // 如果正則表達式有錯誤，使用簡單字串搜尋
+                searchResults = findSimpleMatches(content, searchTerm, caseSensitive, wholeWord);
+                currentSearchIndex = searchResults.length > 0 ? 0 : -1;
+                updateSearchResults();
+                highlightSearchResults();
+                return;
+            }
+            
+            let match;
+            const lines = content.split('\n');
+            let totalLength = 0;
+            
+            // 計算每行的起始位置
+            const lineStartPositions = [0];
+            for (let i = 0; i < lines.length - 1; i++) {
+                totalLength += lines[i].length + 1; // +1 for newline
+                lineStartPositions.push(totalLength);
+            }
+            
+            // 找到所有匹配
+            while ((match = regex.exec(content)) !== null) {
+                const matchStart = match.index;
+                const matchEnd = matchStart + match[0].length;
+                
+                // 找到匹配所在的行號
+                let lineNumber = 0;
+                for (let i = 0; i < lineStartPositions.length; i++) {
+                    if (matchStart < lineStartPositions[i]) {
+                        lineNumber = i;
+                        break;
+                    }
+                    if (i === lineStartPositions.length - 1) {
+                        lineNumber = i + 1;
+                        break;
+                    }
+                }
+                
+                // 計算在該行中的位置
+                const lineStartPos = lineStartPositions[lineNumber - 1] || 0;
+                const columnNumber = matchStart - lineStartPos + 1;
+                
+                searchResults.push({
+                    start: matchStart,
+                    end: matchEnd,
+                    line: lineNumber,
+                    column: columnNumber,
+                    text: match[0]
+                });
+                
+                // 防止無限循環
+                if (match[0].length === 0) {
+                    regex.lastIndex++;
+                }
+            }
+            
+            currentSearchIndex = searchResults.length > 0 ? 0 : -1;
+            updateSearchResults();
+            highlightSearchResults();
+            
+            // 跳到第一個結果
+            if (currentSearchIndex >= 0) {
+                scrollToSearchResult(currentSearchIndex);
+            }
+        }
+        
+        function findSimpleMatches(content, searchTerm, caseSensitive, wholeWord) {
+            const results = [];
+            const searchText = caseSensitive ? content : content.toLowerCase();
+            const term = caseSensitive ? searchTerm : searchTerm.toLowerCase();
+            
+            let startIndex = 0;
+            const lines = content.split('\n');
+            let totalLength = 0;
+            
+            // 計算每行的起始位置
+            const lineStartPositions = [0];
+            for (let i = 0; i < lines.length - 1; i++) {
+                totalLength += lines[i].length + 1;
+                lineStartPositions.push(totalLength);
+            }
+            
+            while (true) {
+                const index = searchText.indexOf(term, startIndex);
+                if (index === -1) break;
+                
+                // 檢查整字匹配
+                if (wholeWord) {
+                    const beforeChar = index > 0 ? content[index - 1] : '';
+                    const afterChar = index + term.length < content.length ? content[index + term.length] : '';
+                    
+                    if (/\w/.test(beforeChar) || /\w/.test(afterChar)) {
+                        startIndex = index + 1;
+                        continue;
+                    }
+                }
+                
+                // 找到匹配所在的行號
+                let lineNumber = 0;
+                for (let i = 0; i < lineStartPositions.length; i++) {
+                    if (index < lineStartPositions[i]) {
+                        lineNumber = i;
+                        break;
+                    }
+                    if (i === lineStartPositions.length - 1) {
+                        lineNumber = i + 1;
+                        break;
+                    }
+                }
+                
+                // 計算在該行中的位置
+                const lineStartPos = lineStartPositions[lineNumber - 1] || 0;
+                const columnNumber = index - lineStartPos + 1;
+                
+                results.push({
+                    start: index,
+                    end: index + searchTerm.length,
+                    line: lineNumber,
+                    column: columnNumber,
+                    text: content.substring(index, index + searchTerm.length)
+                });
+                
+                startIndex = index + 1;
+            }
+            
+            return results;
+        }
+        
+        function escapeRegExp(string) {
+            return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }
+        
+        function navigateSearch(direction) {
+            if (searchResults.length === 0) return;
+            
+            currentSearchIndex += direction;
+            
+            if (currentSearchIndex >= searchResults.length) {
+                currentSearchIndex = 0;
+            } else if (currentSearchIndex < 0) {
+                currentSearchIndex = searchResults.length - 1;
+            }
+            
+            updateSearchResults();
+            highlightSearchResults();
+            scrollToSearchResult(currentSearchIndex);
+        }
+        
+        function scrollToSearchResult(index) {
+            if (index < 0 || index >= searchResults.length) return;
+            
+            const result = searchResults[index];
+            const lines = codeEditor.value.substring(0, result.start).split('\n');
+            const lineHeight = 21; // 基於 line-height: 1.5 和 font-size: 14px
+            const scrollTop = Math.max(0, (lines.length - 1) * lineHeight - codeEditor.clientHeight / 2);
+            
+            codeEditor.scrollTop = scrollTop;
+            syntaxHighlight.scrollTop = scrollTop;
+            lineNumbers.scrollTop = scrollTop;
+            
+            // 設置光標位置
+            codeEditor.focus();
+            codeEditor.setSelectionRange(result.start, result.end);
+        }
+        
+        function updateSearchResults() {
+            if (searchResults.length === 0) {
+                searchResultsDiv.textContent = searchInput.value ? '無匹配結果' : '';
+                prevBtn.disabled = true;
+                nextBtn.disabled = true;
+            } else {
+                const current = currentSearchIndex + 1;
+                const total = searchResults.length;
+                const currentResult = searchResults[currentSearchIndex];
+                searchResultsDiv.textContent = `${current}/${total} (行 ${currentResult.line})`;
+                prevBtn.disabled = false;
+                nextBtn.disabled = false;
+            }
+        }
+        
+        function highlightSearchResults() {
+            if (!currentFile) return;
+            
+            // 更新語法高亮，包括搜尋高亮
+            updateSyntaxHighlight();
+        }
+        
+        function clearSearchHighlights() {
+            updateSyntaxHighlight();
+        }
+        
+        // 語法高亮
+        function highlightSyntax(code, fileExt) {
+            let highlightedCode = code;
+            
+            // 轉換HTML特殊字符
+            highlightedCode = highlightedCode.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            
+            if (fileExt === 'html' || fileExt === 'htm') {
+                // HTML語法高亮
+                highlightedCode = highlightedCode.replace(/(&lt;!DOCTYPE[^&]*&gt;)/g, '<span class="html-doctype">$1</span>');
+                highlightedCode = highlightedCode.replace(/(&lt;!--[\s\S]*?--&gt;)/g, '<span class="html-comment">$1</span>');
+                highlightedCode = highlightedCode.replace(/(&lt;\/?)([a-zA-Z][a-zA-Z0-9]*)(.*?)(&gt;)/g, function(match, open, tagName, attrs, close) {
+                    let highlighted = '<span class="html-tag">' + open + tagName + '</span>';
+                    attrs = attrs.replace(/([a-zA-Z-]+)(\s*=\s*)(["'])(.*?)\3/g, 
+                        '<span class="html-attribute">$1</span>$2<span class="html-string">$3$4$3</span>');
+                    return highlighted + attrs + '<span class="html-tag">' + close + '</span>';
+                });
+                
+                // CSS in style tags
+                highlightedCode = highlightedCode.replace(/(&lt;style[^&]*&gt;)([\s\S]*?)(&lt;\/style&gt;)/gi, function(match, openTag, cssContent, closeTag) {
+                    cssContent = cssContent.replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="js-comment">$1</span>');
+                    cssContent = cssContent.replace(/([^{}]+)(\s*\{[^}]*\})/g, function(cssMatch, selector, block) {
+                        selector = '<span class="css-selector">' + selector.trim() + '</span>';
+                        block = block.replace(/([a-zA-Z-]+)(\s*:\s*)([^;]+)(;?)/g, 
+                            '<span class="css-property">$1</span>$2<span class="css-value">$3</span>$4');
+                        return selector + block;
+                    });
+                    return openTag + cssContent + closeTag;
+                });
+                
+                // JS in script tags
+                highlightedCode = highlightedCode.replace(/(&lt;script[^&]*&gt;)([\s\S]*?)(&lt;\/script&gt;)/gi, function(match, openTag, jsContent, closeTag) {
+                    jsContent = highlightJS(jsContent);
+                    return openTag + jsContent + closeTag;
+                });
+            } else if (fileExt === 'css') {
+                // CSS語法高亮
+                highlightedCode = highlightedCode.replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="js-comment">$1</span>');
+                highlightedCode = highlightedCode.replace(/([^{}]+)(\s*\{[^}]*\})/g, function(cssMatch, selector, block) {
+                    selector = '<span class="css-selector">' + selector.trim() + '</span>';
+                    block = block.replace(/([a-zA-Z-]+)(\s*:\s*)([^;]+)(;?)/g, 
+                        '<span class="css-property">$1</span>$2<span class="css-value">$3</span>$4');
+                    return selector + block;
+                });
+            } else if (fileExt === 'js' || fileExt === 'ts' || fileExt === 'jsx' || fileExt === 'tsx') {
+                // JavaScript語法高亮
+                highlightedCode = highlightJS(highlightedCode);
+            }
+            
+            // 添加搜尋高亮
+            if (searchResults.length > 0 && searchInput.value) {
+                highlightedCode = addSearchHighlights(highlightedCode, code);
+            }
+            
+            return highlightedCode;
+        }
+        
+        function addSearchHighlights(highlightedCode, originalCode) {
+            // 創建一個映射，將原始位置對應到高亮後的位置
+            let offset = 0;
+            let result = highlightedCode;
+            
+            // 按位置倒序處理，避免位置偏移問題
+            const sortedResults = [...searchResults].sort((a, b) => b.start - a.start);
+            
+            for (let i = 0; i < sortedResults.length; i++) {
+                const searchResult = sortedResults[i];
+                const originalIndex = sortedResults.findIndex(r => r === searchResult);
+                
+                // 獲取要高亮的文字（需要轉義HTML）
+                const searchText = originalCode.substring(searchResult.start, searchResult.end);
+                const escapedText = searchText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                
+                // 在高亮後的代碼中找到對應位置（這是一個簡化的方法）
+                const regex = new RegExp(escapeRegExp(escapedText), 'g');
+                let matches = 0;
+                let targetMatch = searchResults.length - 1 - i;
+                
+                result = result.replace(regex, function(match, position) {
+                    if (matches === targetMatch) {
+                        const isCurrentResult = originalIndex === currentSearchIndex;
+                        const className = isCurrentResult ? 'search-highlight current' : 'search-highlight';
+                        matches++;
+                        return `<span class="${className}">${match}</span>`;
+                    }
+                    matches++;
+                    return match;
+                });
+            }
+            
+            return result;
+        }
+        
+        function highlightJS(jsContent) {
+            // JS註釋
+            jsContent = jsContent.replace(/(\/\/.*$)/gm, '<span class="js-comment">$1</span>');
+            jsContent = jsContent.replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="js-comment">$1</span>');
+            
+            // 字符串
+            jsContent = jsContent.replace(/(["'`])((?:\\.|(?!\1)[^\\])*)\1/g, '<span class="js-string">$1$2$1</span>');
+            
+            // 數字
+            jsContent = jsContent.replace(/\b(\d+\.?\d*)\b/g, '<span class="js-number">$1</span>');
+            
+            // 關鍵字
+            jsContent = jsContent.replace(/\b(function|var|let|const|if|else|for|while|return|true|false|null|undefined|new|this|class|extends|import|export|from|async|await|try|catch|finally|throw|typeof|instanceof)\b/g, 
+                '<span class="js-keyword">$1</span>');
+            
+            return jsContent;
+        }
+        
+        function updateLineNumbers() {
+            const content = codeEditor.value;
+            const lines = content.split('\n').length;
+            
+            let lineNumbersContent = '';
+            for (let i = 1; i <= lines; i++) {
+                lineNumbersContent += i + '\n';
+            }
+            
+            lineNumbers.textContent = lineNumbersContent.slice(0, -1); // 移除最後的換行
+        }
+        
+        function updateSyntaxHighlight() {
+            if (!currentFile) {
+                syntaxHighlight.innerHTML = '';
+                lineNumbers.textContent = '1';
+                return;
+            }
+            
+            const code = codeEditor.value;
+            const fileExt = getFileExtension(currentFile);
+            syntaxHighlight.innerHTML = highlightSyntax(code, fileExt);
+            updateLineNumbers();
+        }
+        
+        function syncScroll() {
+            syntaxHighlight.scrollTop = codeEditor.scrollTop;
+            syntaxHighlight.scrollLeft = codeEditor.scrollLeft;
+            lineNumbers.scrollTop = codeEditor.scrollTop;
+        }
+        
+        // 檔案操作
+        function newFile() {
+            let fileName;
+            do {
+                fileName = `untitled${fileCounter}.html`;
+                fileCounter++;
+            } while (files[fileName]);
+            
+            files[fileName] = {
+                content: '',
+                lastModified: new Date(),
+                saved: true
+            };
+            
+            currentFile = fileName;
+            updateFileSelect();
+            switchToFile(fileName);
+            saveToLocalStorage();
+        }
+        
+        function openFiles() {
+            document.getElementById('fileInput').click();
+        }
+        
+        function handleFileLoad(event) {
+            const fileList = event.target.files;
+            
+            for (let file of fileList) {
+                // 先檢查是否為備份檔案
+                if (handleImportFile(file)) {
+                    continue;
+                }
+                
+                // 一般檔案處理
+                if (isValidFileType(file.name)) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        let fileName = file.name;
+                        let counter = 1;
+                        
+                        // 處理重複檔名
+                        while (files[fileName]) {
+                            const nameParts = file.name.split('.');
+                            const ext = nameParts.pop();
+                            const baseName = nameParts.join('.');
+                            fileName = `${baseName}(${counter}).${ext}`;
+                            counter++;
+                        }
+                        
+                        files[fileName] = {
+                            content: e.target.result,
+                            lastModified: new Date(),
+                            saved: true
+                        };
+                        
+                        if (!currentFile) {
+                            currentFile = fileName;
+                            switchToFile(fileName);
+                        }
+                        
+                        updateFileSelect();
+                        saveToLocalStorage();
+                    };
+                    reader.readAsText(file);
+                } else {
+                    alert(`不支援的檔案類型: ${file.name}`);
+                }
+            }
+            
+            event.target.value = '';
+        }
+        
+        function isValidFileType(fileName) {
+            const validExtensions = [
+                'html', 'htm', 'css', 'js', 'txt', 'json', 'xml', 'md',
+                'py', 'java', 'cpp', 'c', 'php', 'rb', 'go', 'rs',
+                'ts', 'jsx', 'tsx', 'vue', 'scss', 'sass', 'less',
+                'sql', 'sh', 'bat', 'yaml', 'yml', 'ini', 'cfg', 'conf'
+            ];
+            const ext = getFileExtension(fileName);
+            return validExtensions.includes(ext) || fileName.includes('code-editor-backup');
+        }
+        
+        function getFileExtension(fileName) {
+            return fileName.split('.').pop().toLowerCase();
+        }
+        
+        function saveFile() {
+            if (!currentFile) {
+                alert('沒有檔案可以儲存');
+                return;
+            }
+            
+            const content = codeEditor.value;
+            const blob = new Blob([content], { type: getMimeType(currentFile) });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = currentFile;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            // 標記為已儲存
+            files[currentFile].saved = true;
+            files[currentFile].lastModified = new Date();
+            isModified = false;
+            updateUI();
+        }
+        
+        function getMimeType(fileName) {
+            const ext = getFileExtension(fileName);
+            const mimeTypes = {
+                'html': 'text/html',
+                'htm': 'text/html',
+                'css': 'text/css',
+                'js': 'application/javascript',
+                'json': 'application/json',
+                'xml': 'application/xml',
+                'txt': 'text/plain',
+                'md': 'text/markdown',
+                'py': 'text/x-python',
+                'java': 'text/x-java',
+                'cpp': 'text/x-c++src',
+                'c': 'text/x-csrc'
+            };
+            return mimeTypes[ext] || 'text/plain';
+        }
+        
+        function closeFile() {
+            if (!currentFile) return;
+            
+            // 先儲存當前檔案的內容
+            if (files[currentFile]) {
+                files[currentFile].content = codeEditor.value;
+            }
+            
+            if (!files[currentFile].saved) {
+                if (!confirm(`檔案 "${currentFile}" 尚未儲存，確定要關閉嗎？`)) {
+                    return;
+                }
+            }
+            
+            const fileToClose = currentFile;
+            delete files[fileToClose];
+            
+            // 選擇下一個檔案
+            const fileNames = Object.keys(files);
+            if (fileNames.length > 0) {
+                // 選擇第一個可用的檔案
+                currentFile = fileNames[0];
+                switchToFile(currentFile);
+            } else {
+                // 沒有其他檔案了
+                currentFile = null;
+                codeEditor.value = '';
+                codeEditor.placeholder = '選擇或創建一個檔案開始編輯...';
+                syntaxHighlight.innerHTML = '';
+                lineNumbers.textContent = '1';
+            }
+            
+            updateFileSelect();
+            updateUI();
+            saveToLocalStorage();
+            
+            // 清除搜尋結果（如果有的話）
+            if (isSearchVisible) {
+                clearSearchHighlights();
+                searchResults = [];
+                currentSearchIndex = -1;
+                updateSearchResults();
+            }
+        }
+        
+        function renameFile() {
+            if (!currentFile) {
+                alert('沒有選擇檔案');
+                return;
+            }
+            
+            const newName = prompt('輸入新的檔案名稱:', currentFile);
+            if (!newName || newName === currentFile) return;
+            
+            // 檢查非法字元
+            if (/[<>:"/\\|?*]/.test(newName)) {
+                alert('檔案名稱包含非法字元: < > : " / \\ | ? *');
+                return;
+            }
+            
+            // 檢查重複名稱
+            if (files[newName]) {
+                alert('檔案名稱已存在');
+                return;
+            }
+            
+            // 重新命名
+            files[newName] = files[currentFile];
+            delete files[currentFile];
+            currentFile = newName;
+            
+            updateFileSelect();
+            updateUI();
+            saveToLocalStorage();
+        }
+        
+        function switchToFile(fileName) {
+            if (!fileName || !files[fileName]) return;
+            
+            // 儲存當前檔案內容（如果有的話）
+            if (currentFile && files[currentFile] && currentFile !== fileName) {
+                files[currentFile].content = codeEditor.value;
+                console.log(`儲存檔案 ${currentFile} 的內容:`, files[currentFile].content.substring(0, 50) + '...');
+            }
+            
+            // 切換到新檔案
+            currentFile = fileName;
+            codeEditor.value = files[fileName].content || '';
+            codeEditor.placeholder = '';
+            isModified = false;
+            
+            console.log(`載入檔案 ${fileName} 的內容:`, files[fileName].content.substring(0, 50) + '...');
+            
+            updateUI();
+            updateSyntaxHighlight();
+            updateLineNumbers();
+            
+            // 顯示/隱藏執行按鈕
+            const ext = getFileExtension(fileName);
+            runBtn.style.display = (ext === 'html' || ext === 'htm') ? 'inline-block' : 'none';
+            
+            // 如果搜尋功能開啟，重新執行搜尋
+            if (isSearchVisible && searchInput.value) {
+                performSearch();
+            }
+        }
+        
+        function updateFileSelect() {
+            const fileNames = Object.keys(files);
+            fileSelect.innerHTML = '<option value="">選擇檔案...</option>';
+            
+            fileNames.forEach(fileName => {
+                const option = document.createElement('option');
+                option.value = fileName;
+                option.textContent = fileName + (files[fileName].saved ? '' : ' *');
+                if (fileName === currentFile) {
+                    option.selected = true;
+                }
+                fileSelect.appendChild(option);
+            });
+        }
+        
+        function updateUI() {
+            const fileNames = Object.keys(files);
+            fileCount.textContent = `檔案: ${fileNames.length}`;
+            
+            if (currentFile) {
+                fileStatus.textContent = `檔案: ${currentFile}`;
+                saveStatus.textContent = files[currentFile].saved ? '已儲存' : '未儲存 *';
+                saveStatus.style.color = files[currentFile].saved ? '#6a9955' : '#f14c4c';
+            } else {
+                fileStatus.textContent = '未選擇檔案';
+                saveStatus.textContent = '';
+            }
+            
+            const content = codeEditor.value;
+            const lines = content ? content.split('\n').length : 0;
+            lineCount.textContent = `行: ${lines}`;
+            charCount.textContent = `字元: ${content.length}`;
+        }
+        
+        // 編輯功能
+        function copyAll() {
+            if (!currentFile) {
+                alert('沒有內容可以複製');
+                return;
+            }
+            
+            navigator.clipboard.writeText(codeEditor.value).then(() => {
+                showAutosaveIndicator('已複製到剪貼簿');
+            }).catch(() => {
+                // 備用方法
+                codeEditor.select();
+                document.execCommand('copy');
+                showAutosaveIndicator('已複製到剪貼簿');
+            });
+        }
+        
+        function pasteContent() {
+            if (!currentFile) {
+                alert('請先選擇或創建一個檔案');
+                return;
+            }
+            
+            navigator.clipboard.readText().then(text => {
+                const start = codeEditor.selectionStart;
+                const end = codeEditor.selectionEnd;
+                const currentValue = codeEditor.value;
+                
+                codeEditor.value = currentValue.substring(0, start) + text + currentValue.substring(end);
+                codeEditor.selectionStart = codeEditor.selectionEnd = start + text.length;
+                
+                markAsModified();
+                updateSyntaxHighlight();
+                updateLineNumbers();
+                scheduleAutosave();
+            }).catch(() => {
+                alert('無法讀取剪貼簿內容');
+            });
+        }
+        
+        function clearContent() {
+            if (!currentFile) return;
+            
+            if (confirm('確定要清除所有內容嗎？')) {
+                codeEditor.value = '';
+                markAsModified();
+                updateSyntaxHighlight();
+                updateLineNumbers();
+                scheduleAutosave();
+            }
+        }
+        
+        function runHTML() {
+            if (!currentFile) return;
+            
+            const ext = getFileExtension(currentFile);
+            if (ext !== 'html' && ext !== 'htm') return;
+            
+            const content = codeEditor.value;
+            const blob = new Blob([content], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            window.open(url, '_blank');
+            
+            // 清理URL
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+        
+        function toggleWordWrap() {
+            const wordWrap = document.getElementById('wordWrapToggle').checked;
+            codeEditor.style.whiteSpace = wordWrap ? 'pre-wrap' : 'pre';
+            syntaxHighlight.style.whiteSpace = wordWrap ? 'pre-wrap' : 'pre';
+            updateLineNumbers(); // 重新計算行號
+        }
+        
+        function markAsModified() {
+            if (currentFile && files[currentFile]) {
+                files[currentFile].saved = false;
+                isModified = true;
+                updateUI();
+                updateFileSelect();
+            }
+        }
+        
+        function scheduleAutosave() {
+            clearTimeout(autosaveTimeout);
+            autosaveTimeout = setTimeout(autosave, 1000);
+        }
+        
+        function autosave() {
+            if (currentFile && files[currentFile] && !files[currentFile].saved) {
+                files[currentFile].content = codeEditor.value;
+                files[currentFile].lastModified = new Date();
+                saveToLocalStorage();
+                
+                // 同時自動儲存到 IndexedDB
+                if (db) {
+                    const transaction = db.transaction(['files'], 'readwrite');
+                    const fileStore = transaction.objectStore('files');
+                    
+                    const fileRecord = {
+                        name: currentFile,
+                        content: files[currentFile].content,
+                        lastModified: files[currentFile].lastModified,
+                        saved: true,
+                        extension: getFileExtension(currentFile)
+                    };
+                    
+                    fileStore.put(fileRecord);
+                }
+                
+                showAutosaveIndicator('自動儲存完成');
+            }
+        }
+        
+        function showAutosaveIndicator(message) {
+            autosaveIndicator.textContent = message;
+            autosaveIndicator.classList.add('show');
+            setTimeout(() => {
+                autosaveIndicator.classList.remove('show');
+            }, 2000);
+        }
+        
+        // 本地存儲
+        function saveToLocalStorage() {
+            try {
+                localStorage.setItem('editorFiles', JSON.stringify(files));
+                localStorage.setItem('editorCurrentFile', currentFile || '');
+                localStorage.setItem('editorFileCounter', fileCounter.toString());
+            } catch (e) {
+                console.warn('無法儲存到本地存儲:', e);
+            }
+        }
+        
+        function loadFromLocalStorage() {
+            try {
+                const savedFiles = localStorage.getItem('editorFiles');
+                const savedCurrentFile = localStorage.getItem('editorCurrentFile');
+                const savedCounter = localStorage.getItem('editorFileCounter');
+                
+                if (savedFiles) {
+                    files = JSON.parse(savedFiles);
+                }
+                
+                if (savedCurrentFile && files[savedCurrentFile]) {
+                    currentFile = savedCurrentFile;
+                    switchToFile(currentFile);
+                }
+                
+                if (savedCounter) {
+                    fileCounter = parseInt(savedCounter);
+                }
+                
+                updateFileSelect();
+            } catch (e) {
+                console.warn('無法從本地存儲讀取:', e);
+            }
+        }
+        
+        // 事件監聽器
+        codeEditor.addEventListener('input', function() {
+            // 即時更新當前檔案的內容
+            if (currentFile && files[currentFile]) {
+                files[currentFile].content = codeEditor.value;
+            }
+            
+            markAsModified();
+            updateUI();
+            updateSyntaxHighlight();
+            updateLineNumbers();
+            scheduleAutosave();
+            
+            // 如果搜尋功能開啟，重新執行搜尋
+            if (isSearchVisible && searchInput.value) {
+                performSearch();
+            }
+        });
+        
+        codeEditor.addEventListener('scroll', syncScroll);
+        
+        codeEditor.addEventListener('keydown', function(e) {
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                const start = this.selectionStart;
+                const end = this.selectionEnd;
+                this.value = this.value.substring(0, start) + '    ' + this.value.substring(end);
+                this.selectionStart = this.selectionEnd = start + 4;
+                markAsModified();
+                updateSyntaxHighlight();
+                updateLineNumbers();
+                scheduleAutosave();
+            }
+        });
+        
+        fileSelect.addEventListener('change', function() {
+            if (this.value) {
+                switchToFile(this.value);
+            }
+        });
+        
+        document.getElementById('fileInput').addEventListener('change', handleFileLoad);
+        
+        // 搜尋相關事件監聽器
+        searchInput.addEventListener('input', performSearch);
+        searchInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (e.shiftKey) {
+                    navigateSearch(-1); // Shift+Enter: 上一個
+                } else {
+                    navigateSearch(1);  // Enter: 下一個
+                }
+            } else if (e.key === 'Escape') {
+                toggleSearch();
+            }
+        });
+        
+        // 防止意外離開頁面
+        caseSensitiveToggle.addEventListener('change', performSearch);
+        wholeWordToggle.addEventListener('change', performSearch);
+        
+        // 鍵盤快捷鍵
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey || e.metaKey) {
+                switch (e.key) {
+                    case 's':
+                        e.preventDefault();
+                        saveFile();
+                        break;
+                    case 'n':
+                        e.preventDefault();
+                        newFile();
+                        break;
+                    case 'o':
+                        e.preventDefault();
+                        openFiles();
+                        break;
+                    case 'w':
+                        e.preventDefault();
+                        closeFile();
+                        break;
+                    case 'f':
+                        e.preventDefault();
+                        if (!isSearchVisible) {
+                            toggleSearch();
+                        } else {
+                            searchInput.focus();
+                        }
+                        break;
+                    case 'h':
+                        e.preventDefault();
+                        // 可以在這裡添加替換功能
+                        break;
+                }
+            } else if (e.key === 'F3') {
+                e.preventDefault();
+                if (e.shiftKey) {
+                    navigateSearch(-1);
+                } else {
+                    navigateSearch(1);
+                }
+            } else if (e.key === 'Escape') {
+                if (isSearchVisible) {
+                    toggleSearch();
+                }
+            }
+        });
+        
+        // 定期自動儲存到本地存儲
+        setInterval(() => {
+            // 儲存當前編輯中的內容
+            if (currentFile && files[currentFile]) {
+                files[currentFile].content = codeEditor.value;
+            }
+            saveToLocalStorage();
+        }, 30000); // 每30秒自動儲存一次
+        
+        // 頁面關閉前確保儲存
+        window.addEventListener('beforeunload', function(e) {
+            // 儲存當前檔案內容
+            if (currentFile && files[currentFile]) {
+                files[currentFile].content = codeEditor.value;
+                saveToLocalStorage();
+            }
+            
+            const hasUnsavedFiles = Object.values(files).some(file => !file.saved);
+            if (hasUnsavedFiles) {
+                e.preventDefault();
+                e.returnValue = '有未儲存的檔案，確定要離開嗎？';
+                return e.returnValue;
+            }
+        });
+    </script>
+
+  <script>
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, 64, 64); // 全透明
+    document.getElementById('favicon').href = canvas.toDataURL();
+  </script>
+</body>
+</html>
